@@ -34,7 +34,11 @@ public class GetLandingPagesQueryHandler : IRequestHandler<GetLandingPagesQuery,
     }
 }
 
-public record GetLandingPageBySlugQuery(string Slug) : IRequest<LandingPageDetailDto>;
+public record GetLandingPageBySlugQuery(string Slug) : IRequest<LandingPageDetailDto>, ICacheable
+{
+    public string CacheKey => $"landingpage:slug:{Slug}";
+    public TimeSpan CacheDuration => TimeSpan.FromMinutes(60);
+}
 
 public class GetLandingPageBySlugQueryHandler : IRequestHandler<GetLandingPageBySlugQuery, LandingPageDetailDto>
 {

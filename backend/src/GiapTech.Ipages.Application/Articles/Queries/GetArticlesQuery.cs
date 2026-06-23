@@ -102,7 +102,11 @@ public class GetArticleByIdQueryHandler : IRequestHandler<GetArticleByIdQuery, A
     }
 }
 
-public record GetArticleBySlugQuery(string Slug) : IRequest<ArticleDetailDto>;
+public record GetArticleBySlugQuery(string Slug) : IRequest<ArticleDetailDto>, ICacheable
+{
+    public string CacheKey => $"article:slug:{Slug}";
+    public TimeSpan CacheDuration => TimeSpan.FromMinutes(30);
+}
 
 public class GetArticleBySlugQueryHandler : IRequestHandler<GetArticleBySlugQuery, ArticleDetailDto>
 {

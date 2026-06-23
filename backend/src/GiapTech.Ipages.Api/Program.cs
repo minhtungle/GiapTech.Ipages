@@ -1,15 +1,21 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using GiapTech.Ipages.Application;
 using GiapTech.Ipages.Infrastructure;
+using GiapTech.Ipages.Infrastructure.BackgroundJobs;
 using GiapTech.Ipages.Infrastructure.MultiTenant;
 using GiapTech.Ipages.Infrastructure.Persistence;
 using GiapTech.Ipages.Infrastructure.Persistence.Seed;
+using Hangfire;
+using Hangfire.Dashboard;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Prometheus;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -103,15 +109,25 @@ try
         .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!, name: "postgresql")
         .AddRedis(builder.Configuration.GetConnectionString("Redis")!, name: "redis");
 
-    // Rate Limiting
+    // Per-tenant rate limiting
     builder.Services.AddRateLimiter(options =>
     {
-        options.AddFixedWindowLimiter("api", policy =>
+        options.AddPolicy("per-tenant", ctx =>
         {
-            policy.Window = TimeSpan.FromMinutes(1);
-            policy.PermitLimit = 300;
-            policy.QueueLimit = 10;
+            var host = ctx.Request.Host.Host;
+            var dotIdx = host.IndexOf('.');
+            var tenantKey = dotIdx > 0 ? host[..dotIdx] : ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+            return RateLimitPartition.GetFixedWindowLimiter(tenantKey, _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = 300,
+                QueueLimit = 10,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            });
         });
+
+        options.RejectionStatusCode = 429;
     });
 
     var app = builder.Build();
@@ -139,19 +155,18 @@ try
         }
     }
 
+    // Register recurring Hangfire jobs
+    RecurringJob.AddOrUpdate<CleanupExpiredTokensJob>(
+        "cleanup-expired-tokens",
+        job => job.ExecuteAsync(),
+        Cron.Hourly);
+
     // Middleware pipeline
     app.UseSerilogRequestLogging();
+    app.UseHttpMetrics();
 
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "GiapTech.Ipages API v1"));
-    }
-    else
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "GiapTech.Ipages API v1"));
-    }
+    app.UseSwagger();
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "GiapTech.Ipages API v1"));
 
     app.UseMiddleware<ExceptionMiddleware>();
     app.UseMiddleware<TenantMiddleware>();
@@ -161,11 +176,19 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    app.MapControllers();
+    app.MapControllers().RequireRateLimiting("per-tenant");
 
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+    });
+
+    app.MapMetrics("/metrics");
+
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = [new HangfireDashboardAuthFilter()],
+        AppPath = null,
     });
 
     await app.RunAsync();
@@ -177,4 +200,14 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
+}
+
+public class HangfireDashboardAuthFilter : IDashboardAuthorizationFilter
+{
+    public bool Authorize(DashboardContext context)
+    {
+        var httpContext = context.GetHttpContext();
+        return httpContext.User.Identity?.IsAuthenticated == true
+            || httpContext.Connection.RemoteIpAddress?.IsLoopback == true;
+    }
 }

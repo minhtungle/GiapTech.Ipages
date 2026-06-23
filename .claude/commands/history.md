@@ -1,5 +1,63 @@
 # GiapTech.Ipages — History: Files Đã Tạo Theo Phase
 
+## Phase 5 — Production Hardening
+
+**Ngày hoàn thành**: 2026-06-23
+
+### Application — Common Interfaces
+| File | Mô tả |
+|------|-------|
+| `Application/Common/Interfaces/ICacheable.cs` | `CacheKey` + `CacheDuration` — implement trên public queries để enable caching |
+| `Application/Common/Interfaces/IEmailService.cs` | `SendAsync(to, subject, html)` — single + multi-recipient |
+
+### Application — Behaviors
+| File | Mô tả |
+|------|-------|
+| `Application/Common/Behaviors/CachingBehavior.cs` | MediatR pipeline: check Redis trước, set cache sau handler. Key = `{tenantId}:{CacheKey}` |
+
+### Application — Updated Queries (ICacheable)
+| File | Thay đổi |
+|------|---------|
+| `Application/Products/Queries/GetProductsQuery.cs` | `GetProductBySlugQuery` implements `ICacheable` — cache 15 phút |
+| `Application/Articles/Queries/GetArticlesQuery.cs` | `GetArticleBySlugQuery` implements `ICacheable` — cache 30 phút |
+| `Application/LandingPages/Queries/GetLandingPagesQuery.cs` | `GetLandingPageBySlugQuery` implements `ICacheable` — cache 60 phút |
+
+### Application — DI Update
+| File | Thay đổi |
+|------|---------|
+| `Application/DependencyInjection.cs` | Thêm `CachingBehavior<,>` vào MediatR pipeline (trước ValidationBehavior) |
+
+### Infrastructure — Services
+| File | Mô tả |
+|------|-------|
+| `Infrastructure/Services/SmtpEmailService.cs` | MailKit SMTP — connect + auth + send HTML email; no-op nếu SmtpSettings:Host trống |
+
+### Infrastructure — Background Jobs
+| File | Mô tả |
+|------|-------|
+| `Infrastructure/BackgroundJobs/CleanupExpiredTokensJob.cs` | Xóa expired refresh tokens (`RefreshTokenExpiresAt < now`) |
+| `Infrastructure/BackgroundJobs/EmailNotificationJob.cs` | Gửi order confirmation + welcome email |
+
+### Infrastructure — DI Update
+| File | Thay đổi |
+|------|---------|
+| `Infrastructure/DependencyInjection.cs` | Thêm: IEmailService→SmtpEmailService, Hangfire (PostgreSQL storage), HangfireServer, jobs (Transient) |
+| `Infrastructure/GiapTech.Ipages.Infrastructure.csproj` | Thêm: Hangfire.Core, Hangfire.PostgreSql, MailKit |
+
+### API — Updates
+| File | Thay đổi |
+|------|---------|
+| `Api/Program.cs` | Per-tenant rate limiter (keyed by subdomain, 300/min), Prometheus UseHttpMetrics + MapMetrics("/metrics"), Hangfire dashboard (/hangfire) + HangfireDashboardAuthFilter, RegisterRecurringJob CleanupExpiredTokens hourly |
+| `Api/GiapTech.Ipages.Api.csproj` | Thêm: Hangfire.AspNetCore, prometheus-net.AspNetCore |
+
+### Docker
+| File | Mô tả |
+|------|-------|
+| `docker/traefik/traefik.prod.yml` | Production Traefik: websecure entrypoint :443, HTTP→HTTPS redirect, ACME Let's Encrypt httpChallenge |
+| `docker-compose.prod.yml` | Production compose: không expose internal ports, HTTPS trên mọi router (tls.certresolver=letsencrypt), Redis maxmemory 256mb, Traefik basicauth, SMTP env vars |
+
+---
+
 ## Phase 2 — Full CRUD Application Layer
 
 **Ngày hoàn thành**: 2026-06-23

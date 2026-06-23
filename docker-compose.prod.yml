@@ -1,0 +1,261 @@
+version: "3.9"
+
+networks:
+  ipages-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  traefik-acme:
+  traefik-logs:
+
+services:
+  # ===========================
+  # Traefik — HTTPS + Let's Encrypt
+  # ===========================
+  traefik:
+    image: traefik:v3.1
+    container_name: ipages-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker/traefik/traefik.prod.yml:/etc/traefik/traefik.yml:ro
+      - ./docker/traefik/config:/etc/traefik/config:ro
+      - traefik-acme:/etc/traefik/acme
+      - traefik-logs:/var/log/traefik
+    networks:
+      - ipages-net
+    environment:
+      - ACME_EMAIL=${ACME_EMAIL}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${BASE_DOMAIN}`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.middlewares=auth-basic"
+      - "traefik.http.middlewares.auth-basic.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+
+  # ===========================
+  # PostgreSQL
+  # ===========================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ipages-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - ipages-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ===========================
+  # Redis
+  # ===========================
+  redis:
+    image: redis:7-alpine
+    container_name: ipages-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - ipages-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ===========================
+  # MinIO Object Storage
+  # ===========================
+  minio:
+    image: minio/minio:latest
+    container_name: ipages-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    networks:
+      - ipages-net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio-console.rule=Host(`minio.${BASE_DOMAIN}`)"
+      - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.minio-console.service=minio-console-svc"
+      - "traefik.http.services.minio-console-svc.loadbalancer.server.port=9001"
+
+  # ===========================
+  # Backend API
+  # ===========================
+  backend-api:
+    image: giaptech-ipages-api:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ipages-backend-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD}"
+      JwtSettings__Secret: ${JWT_SECRET}
+      JwtSettings__Issuer: ${JWT_ISSUER}
+      JwtSettings__Audience: ${JWT_AUDIENCE}
+      JwtSettings__ExpiryMinutes: ${JWT_EXPIRY_MINUTES:-60}
+      JwtSettings__RefreshExpiryDays: ${JWT_REFRESH_EXPIRY_DAYS:-30}
+      MinioSettings__Host: minio
+      MinioSettings__Port: "9000"
+      MinioSettings__AccessKey: ${MINIO_ROOT_USER}
+      MinioSettings__SecretKey: ${MINIO_ROOT_PASSWORD}
+      MinioSettings__BucketName: ${MINIO_BUCKET_NAME:-ipages-storage}
+      MinioSettings__UseSSL: "false"
+      SmtpSettings__Host: ${SMTP_HOST}
+      SmtpSettings__Port: ${SMTP_PORT:-587}
+      SmtpSettings__Username: ${SMTP_USERNAME}
+      SmtpSettings__Password: ${SMTP_PASSWORD}
+      SmtpSettings__FromEmail: ${SMTP_FROM_EMAIL}
+      SmtpSettings__FromName: ${SMTP_FROM_NAME:-GiapTech.Ipages}
+      BaseDomain: ${BASE_DOMAIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ipages-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend-api.rule=HostRegexp(`{subdomain:.+}.${BASE_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-api.priority=20"
+      - "traefik.http.routers.backend-api.service=backend-api-svc"
+      - "traefik.http.services.backend-api-svc.loadbalancer.server.port=5000"
+      - "traefik.http.routers.backend-api-host.rule=Host(`host.${BASE_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-api-host.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-api-host.priority=25"
+      - "traefik.http.routers.backend-api-host.service=backend-api-svc"
+      - "traefik.http.routers.backend-swagger.rule=Host(`host.${BASE_DOMAIN}`) && PathPrefix(`/swagger`)"
+      - "traefik.http.routers.backend-swagger.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-swagger.priority=25"
+      - "traefik.http.routers.backend-swagger.service=backend-api-svc"
+      - "traefik.http.routers.backend-hangfire.rule=Host(`host.${BASE_DOMAIN}`) && PathPrefix(`/hangfire`)"
+      - "traefik.http.routers.backend-hangfire.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-hangfire.priority=25"
+      - "traefik.http.routers.backend-hangfire.service=backend-api-svc"
+
+  # ===========================
+  # Frontend Host Admin
+  # ===========================
+  frontend-host:
+    image: giaptech-ipages-host:latest
+    build:
+      context: ./frontend-host
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: ipages-frontend-host
+    restart: unless-stopped
+    networks:
+      - ipages-net
+    depends_on:
+      backend-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend-host.rule=Host(`host.${BASE_DOMAIN}`)"
+      - "traefik.http.routers.frontend-host.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend-host.priority=10"
+      - "traefik.http.routers.frontend-host.service=frontend-host-svc"
+      - "traefik.http.services.frontend-host-svc.loadbalancer.server.port=80"
+
+  # ===========================
+  # Frontend Tenant Admin
+  # ===========================
+  frontend-tenant:
+    image: giaptech-ipages-tenant:latest
+    build:
+      context: ./frontend-tenant
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: ipages-frontend-tenant
+    restart: unless-stopped
+    networks:
+      - ipages-net
+    depends_on:
+      backend-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend-tenant.rule=HostRegexp(`{subdomain:.+}.${BASE_DOMAIN}`)"
+      - "traefik.http.routers.frontend-tenant.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend-tenant.priority=5"
+      - "traefik.http.routers.frontend-tenant.service=frontend-tenant-svc"
+      - "traefik.http.services.frontend-tenant-svc.loadbalancer.server.port=80"
+
+  # ===========================
+  # Frontend Client Website
+  # ===========================
+  frontend-client:
+    image: giaptech-ipages-client:latest
+    build:
+      context: ./frontend-client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: ipages-frontend-client
+    restart: unless-stopped
+    networks:
+      - ipages-net
+    depends_on:
+      backend-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

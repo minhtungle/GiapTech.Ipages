@@ -1,7 +1,10 @@
 using GiapTech.Ipages.Application.Common.Interfaces;
+using GiapTech.Ipages.Infrastructure.BackgroundJobs;
 using GiapTech.Ipages.Infrastructure.Persistence;
 using GiapTech.Ipages.Infrastructure.Persistence.Seed;
 using GiapTech.Ipages.Infrastructure.Services;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,6 +51,22 @@ public static class DependencyInjection
                   .Build();
         });
         services.AddScoped<IStorageService, MinioStorageService>();
+
+        // Email
+        services.AddTransient<IEmailService, SmtpEmailService>();
+
+        // Hangfire
+        var pgConnStr = configuration.GetConnectionString("DefaultConnection")!;
+        services.AddHangfire(config => config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(c => c.UseNpgsqlConnection(pgConnStr)));
+        services.AddHangfireServer(opts => opts.WorkerCount = 2);
+
+        // Background jobs
+        services.AddTransient<CleanupExpiredTokensJob>();
+        services.AddTransient<EmailNotificationJob>();
 
         // Other services
         services.AddScoped<IJwtService, JwtService>();

@@ -111,7 +111,11 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, P
     }
 }
 
-public record GetProductBySlugQuery(string Slug) : IRequest<ProductDetailDto>;
+public record GetProductBySlugQuery(string Slug) : IRequest<ProductDetailDto>, ICacheable
+{
+    public string CacheKey => $"product:slug:{Slug}";
+    public TimeSpan CacheDuration => TimeSpan.FromMinutes(15);
+}
 
 public class GetProductBySlugQueryHandler : IRequestHandler<GetProductBySlugQuery, ProductDetailDto>
 {

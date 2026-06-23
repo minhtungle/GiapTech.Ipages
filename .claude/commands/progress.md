@@ -6,80 +6,79 @@ Xem thêm: [rules.md](rules.md) | [stack.md](stack.md) | [history.md](history.md
 
 ## ✅ Phase 1 — Infrastructure + Backend Core + Frontend Skeleton
 
-**Trạng thái**: HOÀN THÀNH (2026-06-23)  
-**Kết quả**: `docker compose up -d` chạy được, login được, seed data sẵn.
+**Trạng thái**: HOÀN THÀNH (2026-06-23)
 
-**Đã làm**:
-- Root: `.gitignore`, `.env.example`, `docker-compose.yml`, `docker-compose.override.yml`, `README.md`
-- Docker: Traefik static + dynamic config
-- Backend: 4-project Clean Architecture solution, 33 Domain entities, Application layer (interfaces, CQRS behaviors, Auth commands), Infrastructure layer (EF Core + migrations viết tay + seed data + all services + TenantMiddleware), API layer (8 controllers, ExceptionMiddleware, Program.cs đầy đủ)
-- Frontend: 3 React apps với skeleton pages (host-admin, tenant-admin, client-website)
+- Root, Docker, Backend (Clean Arch + 33 entities + migrations + seed), 3 Frontend apps skeleton
 - Bug fix: EF Core query filter dùng `_tenantService` field thay vì captured local variable
-
-Chi tiết từng file → xem [history.md](history.md)
 
 ---
 
 ## ✅ Phase 2 — Full CRUD Application Layer
 
-**Trạng thái**: HOÀN THÀNH (2026-06-23)  
-**Mục tiêu**: Implement đầy đủ Commands/Queries cho mọi module.
+**Trạng thái**: HOÀN THÀNH (2026-06-23)
 
-- [x] Tenants CRUD (GetTenantsQuery, CreateTenantCommand, UpdateTenantCommand, DeleteTenantCommand)
-- [x] Users (RegisterCommand, ChangePasswordCommand, GetUsersQuery)
-- [x] Products CRUD + UpdateInventoryCommand
-- [x] Product Categories CRUD
-- [x] Orders CRUD + UpdateOrderStatusCommand + CancelOrderCommand
-- [x] Customers CRUD
-- [x] Articles CRUD + PublishArticleCommand
-- [x] Article Categories CRUD
-- [x] Media (GetMediaFilesQuery, DeleteMediaFileCommand)
-- [x] Dashboard (GetHostDashboardQuery, GetTenantDashboardQuery)
-- [x] IPasswordHasher interface + BCrypt implementation
-- [x] Tất cả controllers refactored sang MediatR
+- IPasswordHasher, tất cả Commands/Queries (Tenants, Users, Products, Orders, Customers, Articles, Media, Dashboard)
+- Tất cả controllers refactored sang MediatR ISender
 
 ---
 
 ## ✅ Phase 3 — Extended Modules
 
-**Trạng thái**: HOÀN THÀNH (2026-06-23)  
-**Mục tiêu**: Implement các module nâng cao.
+**Trạng thái**: HOÀN THÀNH (2026-06-23)
 
-- [x] Cart & CartItem CRUD
-- [x] Coupon: create, validate, apply
-- [x] ApiKey: generate, revoke, list
-- [x] LandingPage builder: CRUD sections
-- [x] Form builder: create form, submit entry, list entries
-- [x] Menu builder: create menu, manage items
-- [x] SeoMetadata: upsert per entity
+- Cart, Coupon, ApiKey, LandingPage, Form, Menu, SeoMetadata — commands + queries + controllers
 
 ---
 
 ## ✅ Phase 4 — Frontend Polish + E2E Integration
 
-**Trạng thái**: HOÀN THÀNH (2026-06-23)  
-**Mục tiêu**: Frontend kết nối đầy đủ với API thực, không dùng mock data.
+**Trạng thái**: HOÀN THÀNH (2026-06-23)
 
-- [x] `frontend-host/src/pages/DashboardPage.tsx` — dùng GET /dashboard (HostDashboardDto)
-- [x] `frontend-tenant/src/pages/DashboardPage.tsx` — dùng GET /dashboard (TenantDashboardDto)
-- [x] `frontend-client/src/pages/ArticleDetailPage.tsx` — fix URL bug `/articles/slug/${slug}`
-- [x] `frontend-tenant/src/pages/ProductCategoriesPage.tsx` — trang CRUD mới
-- [x] `frontend-tenant/src/layouts/AdminLayout.tsx` — thêm menu Danh mục SP
-- [x] `frontend-tenant/src/App.tsx` — thêm route product-categories
-- [x] `frontend-tenant/src/lib/api.ts` — error handling: queue refresh, server error toast, network error toast
-- [x] `frontend-host/src/lib/api.ts` — error handling: queue refresh, server error toast, network error toast
+- Dashboard pages dùng real `/dashboard` endpoint
+- Fix ArticleDetailPage URL bug
+- ProductCategoriesPage mới
+- API interceptors: queue-based 401 refresh, error toasts, redirect on clearAuth
 
 ---
 
-## ⏳ Phase 5 — Production Hardening
+## ✅ Phase 5 — Production Hardening
 
-**Trạng thái**: CHƯA BẮT ĐẦU  
-**Mục tiêu**: Sẵn sàng deploy production.
+**Trạng thái**: HOÀN THÀNH (2026-06-23)
 
-- [ ] HTTPS với Let's Encrypt trong Traefik
-- [ ] Rate limiting per-tenant
-- [ ] Redis caching cho public API endpoints
-- [ ] Background jobs (Hangfire): cleanup expired sessions, email notifications
-- [ ] Email service (SMTP) integration
-- [ ] Prometheus metrics
-- [ ] Production docker-compose (không expose internal ports)
+- [x] HTTPS với Let's Encrypt trong Traefik (`traefik.prod.yml`)
+- [x] Rate limiting per-tenant (keyed FixedWindow 300/min per subdomain)
+- [x] Redis caching cho public endpoints qua `ICacheable` + `CachingBehavior` MediatR pipeline
+  - Products, Articles, LandingPages slug endpoints cached 15/30/60 phút
+- [x] Background jobs (Hangfire + PostgreSQL storage)
+  - `CleanupExpiredTokensJob` chạy hourly
+  - `EmailNotificationJob` (order confirmation, welcome email)
+- [x] Email service (MailKit SMTP) — `IEmailService` + `SmtpEmailService`
+- [x] Prometheus metrics — `prometheus-net.AspNetCore` + `/metrics` endpoint + HTTP metrics
+- [x] Production docker-compose (`docker-compose.prod.yml`)
+  - Không expose internal ports
+  - HTTPS với certresolver=letsencrypt trên mọi router
+  - Redis maxmemory 256mb + allkeys-lru
+  - Traefik dashboard bảo vệ bằng basicauth
+
+---
+
+## Deploy Commands
+
+```bash
+# Development
+docker compose up -d
+
+# Production
+cp .env.example .env.prod
+# Edit .env.prod: set BASE_DOMAIN, ACME_EMAIL, SMTP_*, TRAEFIK_DASHBOARD_AUTH, etc.
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+
+# URLs (production)
+# https://host.{BASE_DOMAIN}         — Host Admin
+# https://{slug}.{BASE_DOMAIN}       — Tenant Admin / Client
+# https://host.{BASE_DOMAIN}/swagger — API Docs
+# https://host.{BASE_DOMAIN}/hangfire — Job Dashboard
+# https://host.{BASE_DOMAIN}/metrics  — Prometheus Metrics
+# https://traefik.{BASE_DOMAIN}      — Traefik Dashboard
+# https://minio.{BASE_DOMAIN}        — MinIO Console
+```
