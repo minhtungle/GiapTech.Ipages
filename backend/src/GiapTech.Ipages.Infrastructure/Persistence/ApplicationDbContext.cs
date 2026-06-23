@@ -57,31 +57,31 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
         // Global tenant filter — lambdas capture `this` (_tenantService) so the filter
         // is evaluated per-request using the scoped service value, not a cached value.
-        modelBuilder.Entity<Role>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<Article>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<ArticleCategory>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<Tag>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<Product>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<ProductCategory>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<ProductVariant>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<ProductAttribute>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<Inventory>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<Customer>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<CustomerAddress>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<Order>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<OrderItem>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<Cart>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<CartItem>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<Coupon>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<ApiKey>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<LandingPage>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<LandingSection>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<Form>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<FormEntry>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<MediaFile>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<Menu>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<MenuItem>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
-        modelBuilder.Entity<SeoMetadata>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.Value);
+        modelBuilder.Entity<Role>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Article>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<ArticleCategory>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Tag>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Product>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<ProductCategory>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<ProductVariant>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<ProductAttribute>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Inventory>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Customer>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<CustomerAddress>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Order>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<OrderItem>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Cart>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<CartItem>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Coupon>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<ApiKey>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<LandingPage>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<LandingSection>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Form>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<FormEntry>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<MediaFile>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Menu>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<MenuItem>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<SeoMetadata>().HasQueryFilter(e => _tenantService.TenantId == null || e.TenantId == _tenantService.TenantId.GetValueOrDefault());
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

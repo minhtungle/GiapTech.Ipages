@@ -1,5 +1,7 @@
+using System.Net;
 using System.Text;
 using System.Threading.RateLimiting;
+using GiapTech.Ipages.Api;
 using GiapTech.Ipages.Application;
 using GiapTech.Ipages.Infrastructure;
 using GiapTech.Ipages.Infrastructure.BackgroundJobs;
@@ -140,9 +142,9 @@ try
 
         try
         {
-            logger.LogInformation("Running database migrations...");
-            await db.Database.MigrateAsync();
-            logger.LogInformation("Migrations completed.");
+            logger.LogInformation("Ensuring database schema...");
+            await db.Database.EnsureCreatedAsync();
+            logger.LogInformation("Database schema ready.");
 
             var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
             await seeder.SeedAsync();
@@ -156,7 +158,8 @@ try
     }
 
     // Register recurring Hangfire jobs
-    RecurringJob.AddOrUpdate<CleanupExpiredTokensJob>(
+    var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+    recurringJobManager.AddOrUpdate<CleanupExpiredTokensJob>(
         "cleanup-expired-tokens",
         job => job.ExecuteAsync(),
         Cron.Hourly);
@@ -208,6 +211,6 @@ public class HangfireDashboardAuthFilter : IDashboardAuthorizationFilter
     {
         var httpContext = context.GetHttpContext();
         return httpContext.User.Identity?.IsAuthenticated == true
-            || httpContext.Connection.RemoteIpAddress?.IsLoopback == true;
+            || (httpContext.Connection.RemoteIpAddress != null && IPAddress.IsLoopback(httpContext.Connection.RemoteIpAddress));
     }
 }

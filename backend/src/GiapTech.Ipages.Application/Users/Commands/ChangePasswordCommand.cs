@@ -1,5 +1,6 @@
 using FluentValidation;
 using GiapTech.Ipages.Application.Common.Exceptions;
+using ValidationException = GiapTech.Ipages.Application.Common.Exceptions.ValidationException;
 using GiapTech.Ipages.Application.Common.Interfaces;
 using GiapTech.Ipages.Domain.Entities;
 using MediatR;

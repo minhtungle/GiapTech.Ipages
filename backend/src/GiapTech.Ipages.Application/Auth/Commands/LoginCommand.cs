@@ -13,7 +13,8 @@ public record UserInfo(Guid Id, string Username, string? FullName, string? Email
 public class LoginCommandHandler(
     IApplicationDbContext db,
     IJwtService jwtService,
-    ICurrentTenantService tenantService) : IRequestHandler<LoginCommand, LoginResult>
+    ICurrentTenantService tenantService,
+    IPasswordHasher passwordHasher) : IRequestHandler<LoginCommand, LoginResult>
 {
     public async Task<LoginResult> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
@@ -40,7 +41,7 @@ public class LoginCommandHandler(
             .FirstOrDefaultAsync(u => u.Username == request.Username && u.IsActive, cancellationToken)
             ?? throw new UnauthorizedException("Invalid username or password.");
 
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (!passwordHasher.Verify(request.Password, user.PasswordHash))
             throw new UnauthorizedException("Invalid username or password.");
 
         var permissions = user.UserRoles

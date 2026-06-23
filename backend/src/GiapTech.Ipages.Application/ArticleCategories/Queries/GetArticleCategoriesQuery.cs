@@ -1,4 +1,5 @@
 using GiapTech.Ipages.Application.Common.Interfaces;
+using GiapTech.Ipages.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,7 +26,7 @@ public class GetArticleCategoriesQueryHandler : IRequestHandler<GetArticleCatego
 
     public async Task<IEnumerable<ArticleCategoryDto>> Handle(GetArticleCategoriesQuery request, CancellationToken ct)
     {
-        var query = _db.ArticleCategories.AsNoTracking().Include(c => c.Parent);
+        IQueryable<ArticleCategory> query = _db.ArticleCategories.AsNoTracking().Include(c => c.Parent);
 
         if (request.ActiveOnly)
             query = query.Where(c => c.IsActive);

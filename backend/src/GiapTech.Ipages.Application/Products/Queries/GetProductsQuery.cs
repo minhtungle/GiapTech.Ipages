@@ -107,7 +107,7 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, P
             .FirstOrDefaultAsync(x => x.Id == request.Id, ct)
             ?? throw new Common.Exceptions.NotFoundException(nameof(Product), request.Id);
 
-        return MapToDetail(p);
+        return ProductMapping.MapToDetail(p);
     }
 }
 
@@ -132,11 +132,11 @@ public class GetProductBySlugQueryHandler : IRequestHandler<GetProductBySlugQuer
             .FirstOrDefaultAsync(x => x.Slug == request.Slug && x.Status == ProductStatus.Active, ct)
             ?? throw new Common.Exceptions.NotFoundException(nameof(Product), request.Slug);
 
-        return MapToDetail(p);
+        return ProductMapping.MapToDetail(p);
     }
 }
 
-file static class ProductMapping
+internal static class ProductMapping
 {
     internal static ProductDetailDto MapToDetail(Product p) =>
         new(p.Id, p.Name, p.Slug, p.Sku, p.Description, p.ShortDescription, p.Price, p.SalePrice,

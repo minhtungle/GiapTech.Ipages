@@ -10,6 +10,14 @@ public class PaginatedList<T>
     public bool HasPreviousPage => Page > 1;
     public bool HasNextPage => Page < TotalPages;
 
+    public PaginatedList(IEnumerable<T> items, int totalCount, int page, int pageSize)
+    {
+        Items = items.ToList();
+        TotalCount = totalCount;
+        Page = page;
+        PageSize = pageSize;
+    }
+
     public static PaginatedList<T> Create(IEnumerable<T> source, int totalCount, int page, int pageSize)
-        => new() { Items = source.ToList(), TotalCount = totalCount, Page = page, PageSize = pageSize };
+        => new PaginatedList<T>(source, totalCount, page, pageSize);
 }

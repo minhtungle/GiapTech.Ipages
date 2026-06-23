@@ -53,7 +53,7 @@ public class MediaController : ControllerBase
             : $"media/{_tenantService.TenantId}/{folder}/{fileName}";
 
         using var stream = file.OpenReadStream();
-        var url = await _storage.UploadAsync(storagePath, stream, file.ContentType);
+        var url = await _storage.UploadAsync(stream, storagePath, file.ContentType);
 
         var mediaType = file.ContentType.StartsWith("image/") ? MediaFileType.Image
             : file.ContentType.StartsWith("video/") ? MediaFileType.Video

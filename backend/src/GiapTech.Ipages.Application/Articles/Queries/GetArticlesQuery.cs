@@ -98,7 +98,7 @@ public class GetArticleByIdQueryHandler : IRequestHandler<GetArticleByIdQuery, A
             .FirstOrDefaultAsync(x => x.Id == request.Id, ct)
             ?? throw new Common.Exceptions.NotFoundException(nameof(Article), request.Id);
 
-        return MapToDetail(a);
+        return ArticleMapping.MapToDetail(a);
     }
 }
 
@@ -121,11 +121,11 @@ public class GetArticleBySlugQueryHandler : IRequestHandler<GetArticleBySlugQuer
             .FirstOrDefaultAsync(x => x.Slug == request.Slug && x.Status == ArticleStatus.Published, ct)
             ?? throw new Common.Exceptions.NotFoundException(nameof(Article), request.Slug);
 
-        return MapToDetail(a);
+        return ArticleMapping.MapToDetail(a);
     }
 }
 
-file static class ArticleMapping
+internal static class ArticleMapping
 {
     internal static ArticleDetailDto MapToDetail(Article a) =>
         new(a.Id, a.Title, a.Slug, a.Excerpt, a.Content, a.ThumbnailUrl, a.CategoryId, a.Category?.Name,

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using GiapTech.Ipages.Application.Common.Interfaces;
 using GiapTech.Ipages.Domain.Entities;
+using GiapTech.Ipages.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http;
 
 namespace GiapTech.Ipages.Infrastructure.Services;
