@@ -1,5 +1,29 @@
 # GiapTech.Ipages — History: Files Đã Tạo Theo Phase
 
+## Post-Deploy Bug Fixes
+
+**Ngày hoàn thành**: 2026-06-24
+
+### Files đã sửa
+
+| File | Thay đổi |
+|---|---|
+| `Application/Common/Models/PaginatedList.cs` | Thêm constructor 4 tham số; `Create()` dùng constructor mới |
+| `Application/Products/Queries/GetProductsQuery.cs` | `file` → `internal static class ProductMapping`; fix unqualified `MapToDetail` |
+| `Application/Articles/Queries/GetArticlesQuery.cs` | `file` → `internal static class ArticleMapping`; fix unqualified `MapToDetail` |
+| `Application/ProductCategories/Queries/GetProductCategoriesQuery.cs` | `var query` → `IQueryable<ProductCategory> query` |
+| `Application/ArticleCategories/Queries/GetArticleCategoriesQuery.cs` | `var query` → `IQueryable<ArticleCategory> query` |
+| `Application/Auth/Commands/LoginCommand.cs` | Inject `IPasswordHasher`; loại bỏ BCrypt trực tiếp |
+| 10 command files (CreateTenant, CreateProduct, CreateArticle, CreateArticleCategory, CouponCommands, LandingPageCommands, UpdateOrderStatus, CreateProductCategory, UpdateInventory, ChangePassword) | Thêm `using ValidationException = ...` |
+| `Infrastructure/Services/AuditService.cs` | Thêm `using GiapTech.Ipages.Infrastructure.Persistence;` |
+| `Infrastructure/GiapTech.Ipages.Infrastructure.csproj` | Thêm `Hangfire.NetCore 1.8.20`, `Microsoft.EntityFrameworkCore.Relational 9.0.5` |
+| `Infrastructure/Persistence/ApplicationDbContext.cs` | Đổi **toàn bộ 25** query filters từ `.TenantId.Value` → `.TenantId.GetValueOrDefault()` |
+| `Api/Program.cs` | Thêm `using System.Net`, `using GiapTech.Ipages.Api;`; fix `IPAddress.IsLoopback`; `MigrateAsync()` → `EnsureCreatedAsync()`; static Hangfire → DI `IRecurringJobManager` |
+| `Api/Controllers/MediaController.cs` | Fix arg order `UploadAsync(stream, storagePath, contentType)` |
+| `frontend-host/nginx.conf` | Thêm `location /api/ { proxy_pass http://backend-api:5000/api/v1/; }` |
+
+---
+
 ## Phase 5 — Production Hardening
 
 **Ngày hoàn thành**: 2026-06-23
