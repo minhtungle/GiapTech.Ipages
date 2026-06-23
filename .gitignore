@@ -1,0 +1,99 @@
+# ===========================
+# Backend - .NET
+# ===========================
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+**/*.suo
+**/*.userosscache
+**/*.sln.docstates
+**/packages/
+**/.nuget/
+**/_ReSharper*/
+**/MigrationBackup/
+**/efpt.config.nswag
+*.ncrunch*
+*.DotSettings.user
+
+# ===========================
+# Frontend - Node / Vite
+# ===========================
+**/node_modules/
+**/dist/
+**/.vite/
+**/.cache/
+**/.parcel-cache/
+**/coverage/
+**/.nyc_output/
+**/storybook-static/
+**/.next/
+**/.nuxt/
+
+# ===========================
+# Runtime data
+# ===========================
+logs/
+*.log
+log/
+temp/
+tmp/
+cache/
+uploads/
+storage/runtime/
+
+# ===========================
+# Docker runtime data
+# ===========================
+postgres-data/
+redis-data/
+minio-data/
+docker-data/
+traefik-data/
+
+# ===========================
+# Secrets / Environment
+# ===========================
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+appsettings.Local.json
+appsettings.Production.json
+appsettings.Staging.json
+secrets.json
+
+# ===========================
+# IDE
+# ===========================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===========================
+# Test results
+# ===========================
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# ===========================
+# Publish output
+# ===========================
+**/publish/
+**/PublishProfiles/
+
+# ===========================
+# Certificate files
+# ===========================
+*.pfx
+*.p12
+*.pem
+*.crt
+*.key

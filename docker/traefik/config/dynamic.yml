@@ -1,0 +1,22 @@
+http:
+  middlewares:
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList:
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+
+    strip-api-prefix:
+      stripPrefix:
+        prefixes:
+          - "/api"

@@ -1,0 +1,239 @@
+version: "3.9"
+
+networks:
+  ipages-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+
+services:
+  # ===========================
+  # Traefik Reverse Proxy
+  # ===========================
+  traefik:
+    image: traefik:v3.1
+    container_name: ipages-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "${TRAEFIK_DASHBOARD_PORT:-8080}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./docker/traefik/config:/etc/traefik/config:ro
+    networks:
+      - ipages-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+
+  # ===========================
+  # PostgreSQL
+  # ===========================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ipages-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-giaptech_ipages}
+      POSTGRES_USER: ${POSTGRES_USER:-giaptech}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-GiapTech@2024!}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - ipages-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-giaptech} -d ${POSTGRES_DB:-giaptech_ipages}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ===========================
+  # Redis
+  # ===========================
+  redis:
+    image: redis:7-alpine
+    container_name: ipages-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-Redis@2024!}
+    volumes:
+      - redis-data:/data
+    networks:
+      - ipages-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-Redis@2024!}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ===========================
+  # MinIO Object Storage
+  # ===========================
+  minio:
+    image: minio/minio:latest
+    container_name: ipages-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-MinIO@2024!}
+    volumes:
+      - minio-data:/data
+    networks:
+      - ipages-net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio-console.rule=Host(`minio.localhost`)"
+      - "traefik.http.routers.minio-console.service=minio-console-svc"
+      - "traefik.http.services.minio-console-svc.loadbalancer.server.port=9001"
+
+  # ===========================
+  # Backend API
+  # ===========================
+  backend-api:
+    image: giaptech-ipages-api:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ipages-backend-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ConnectionStrings__DefaultConnection: "Host=${POSTGRES_HOST:-postgres};Port=${POSTGRES_PORT:-5432};Database=${POSTGRES_DB:-giaptech_ipages};Username=${POSTGRES_USER:-giaptech};Password=${POSTGRES_PASSWORD:-GiapTech@2024!}"
+      ConnectionStrings__Redis: "${REDIS_HOST:-redis}:${REDIS_PORT:-6379},password=${REDIS_PASSWORD:-Redis@2024!}"
+      JwtSettings__Secret: ${JWT_SECRET:-GiapTechIpagesJwtSecret2024SuperLongSecretKeyForHS256Algorithm!}
+      JwtSettings__Issuer: ${JWT_ISSUER:-GiapTech.Ipages}
+      JwtSettings__Audience: ${JWT_AUDIENCE:-GiapTech.Ipages.Clients}
+      JwtSettings__ExpiryMinutes: ${JWT_EXPIRY_MINUTES:-60}
+      JwtSettings__RefreshExpiryDays: ${JWT_REFRESH_EXPIRY_DAYS:-30}
+      MinioSettings__Host: ${MINIO_HOST:-minio}
+      MinioSettings__Port: ${MINIO_PORT:-9000}
+      MinioSettings__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
+      MinioSettings__SecretKey: ${MINIO_ROOT_PASSWORD:-MinIO@2024!}
+      MinioSettings__BucketName: ${MINIO_BUCKET_NAME:-ipages-storage}
+      MinioSettings__UseSSL: "false"
+      BaseDomain: ${BASE_DOMAIN:-localhost}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ipages-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      # API route: *.localhost/api/*
+      - "traefik.http.routers.backend-api.rule=HostRegexp(`{subdomain:.+}.localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-api.priority=20"
+      - "traefik.http.routers.backend-api.service=backend-api-svc"
+      - "traefik.http.services.backend-api-svc.loadbalancer.server.port=5000"
+      # host.localhost/api
+      - "traefik.http.routers.backend-api-host.rule=Host(`host.localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-api-host.priority=25"
+      - "traefik.http.routers.backend-api-host.service=backend-api-svc"
+      # Swagger on host.localhost/swagger
+      - "traefik.http.routers.backend-swagger.rule=Host(`host.localhost`) && PathPrefix(`/swagger`)"
+      - "traefik.http.routers.backend-swagger.priority=25"
+      - "traefik.http.routers.backend-swagger.service=backend-api-svc"
+
+  # ===========================
+  # Frontend Host Admin
+  # ===========================
+  frontend-host:
+    image: giaptech-ipages-host:latest
+    build:
+      context: ./frontend-host
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: ipages-frontend-host
+    restart: unless-stopped
+    networks:
+      - ipages-net
+    depends_on:
+      backend-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend-host.rule=Host(`host.localhost`)"
+      - "traefik.http.routers.frontend-host.priority=10"
+      - "traefik.http.routers.frontend-host.service=frontend-host-svc"
+      - "traefik.http.services.frontend-host-svc.loadbalancer.server.port=80"
+
+  # ===========================
+  # Frontend Tenant Admin
+  # ===========================
+  frontend-tenant:
+    image: giaptech-ipages-tenant:latest
+    build:
+      context: ./frontend-tenant
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: ipages-frontend-tenant
+    restart: unless-stopped
+    networks:
+      - ipages-net
+    depends_on:
+      backend-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend-tenant.rule=HostRegexp(`{subdomain:.+}.localhost`)"
+      - "traefik.http.routers.frontend-tenant.priority=5"
+      - "traefik.http.routers.frontend-tenant.service=frontend-tenant-svc"
+      - "traefik.http.services.frontend-tenant-svc.loadbalancer.server.port=80"
+
+  # ===========================
+  # Frontend Client Website
+  # ===========================
+  frontend-client:
+    image: giaptech-ipages-client:latest
+    build:
+      context: ./frontend-client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: ipages-frontend-client
+    restart: unless-stopped
+    networks:
+      - ipages-net
+    depends_on:
+      backend-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

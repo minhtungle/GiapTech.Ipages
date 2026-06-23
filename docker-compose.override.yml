@@ -1,0 +1,37 @@
+version: "3.9"
+
+# Development overrides - exposes ports directly for local development
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  backend-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "5000:5000"
+
+  frontend-host:
+    ports:
+      - "3000:80"
+
+  frontend-tenant:
+    ports:
+      - "3001:80"
+
+  frontend-client:
+    ports:
+      - "3002:80"
