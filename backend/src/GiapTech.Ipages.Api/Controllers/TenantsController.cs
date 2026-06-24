@@ -59,7 +59,7 @@ public class TenantsController : ControllerBase
         if (!_tenantService.IsHostAdmin)
             throw new ForbiddenException();
 
-        var result = await _sender.Send(new UpdateTenantCommand(id, request.Name, request.Email, request.Phone, request.Address, request.Description, request.Status, request.ExpiresAt));
+        var result = await _sender.Send(new UpdateTenantCommand(id, request.Name, request.Email, request.Phone, request.Address, request.Description, request.Status, request.ExpiresAt, request.AdminUsername, request.AdminPassword));
         return Ok(result);
     }
 
@@ -74,4 +74,4 @@ public class TenantsController : ControllerBase
     }
 }
 
-public record UpdateTenantRequest(string Name, string? Email, string? Phone, string? Address, string? Description, TenantStatus Status, DateTime? ExpiresAt);
+public record UpdateTenantRequest(string Name, string? Email, string? Phone, string? Address, string? Description, TenantStatus Status, DateTime? ExpiresAt, string? AdminUsername, string? AdminPassword);

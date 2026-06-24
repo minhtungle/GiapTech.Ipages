@@ -12,13 +12,18 @@ public record UpdateProductCommand(
     Guid Id,
     string Name,
     string? Sku,
-    string? Description,
     string? ShortDescription,
+    string? Description,
     decimal Price,
     decimal? SalePrice,
+    DateTime? SalePriceFrom,
+    DateTime? SalePriceTo,
+    decimal? CostPerItem,
     string? ThumbnailUrl,
     string? Images,
+    string? VideoUrl,
     Guid? CategoryId,
+    string? TagsJson,
     int StockQuantity,
     bool TrackInventory,
     ProductStatus Status,
@@ -34,19 +39,18 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Price).GreaterThanOrEqualTo(0);
         RuleFor(x => x.SalePrice).GreaterThanOrEqualTo(0).LessThan(x => x.Price).When(x => x.SalePrice.HasValue);
+        RuleFor(x => x.CostPerItem).GreaterThanOrEqualTo(0).When(x => x.CostPerItem.HasValue);
         RuleFor(x => x.StockQuantity).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.SalePriceTo).GreaterThan(x => x.SalePriceFrom).When(x => x.SalePriceFrom.HasValue && x.SalePriceTo.HasValue);
     }
 }
 
-public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand, ProductDetailDto>
+public class UpdateProductCommandHandler(IApplicationDbContext db)
+    : IRequestHandler<UpdateProductCommand, ProductDetailDto>
 {
-    private readonly IApplicationDbContext _db;
-
-    public UpdateProductCommandHandler(IApplicationDbContext db) => _db = db;
-
     public async Task<ProductDetailDto> Handle(UpdateProductCommand request, CancellationToken ct)
     {
-        var product = await _db.Products
+        var product = await db.Products
             .Include(p => p.Category)
             .Include(p => p.Variants)
             .Include(p => p.Attributes)
@@ -55,13 +59,18 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
 
         product.Name = request.Name;
         product.Sku = request.Sku;
-        product.Description = request.Description;
         product.ShortDescription = request.ShortDescription;
+        product.Description = request.Description;
         product.Price = request.Price;
         product.SalePrice = request.SalePrice;
+        product.SalePriceFrom = request.SalePriceFrom;
+        product.SalePriceTo = request.SalePriceTo;
+        product.CostPerItem = request.CostPerItem;
         product.ThumbnailUrl = request.ThumbnailUrl;
         product.Images = request.Images;
+        product.VideoUrl = request.VideoUrl;
         product.CategoryId = request.CategoryId;
+        product.TagsJson = request.TagsJson;
         product.StockQuantity = request.StockQuantity;
         product.TrackInventory = request.TrackInventory;
         product.Status = request.Status;
@@ -70,7 +79,7 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         product.MetaDescription = request.MetaDescription;
         product.CanonicalUrl = request.CanonicalUrl;
 
-        await _db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
 
         return ProductMapping.MapToDetail(product);
     }

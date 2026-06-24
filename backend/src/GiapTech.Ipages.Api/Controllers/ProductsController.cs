@@ -38,9 +38,15 @@ public class ProductsController : ControllerBase
 
     [HttpPost]
     [Authorize]
-    public async Task<IActionResult> Create([FromBody] CreateProductCommand command)
+    public async Task<IActionResult> Create([FromBody] CreateProductRequest request)
     {
-        var result = await _sender.Send(command);
+        var result = await _sender.Send(new CreateProductCommand(
+            request.Name, request.Slug, request.Sku, request.ShortDescription, request.Description,
+            request.Price, request.SalePrice, request.SalePriceFrom, request.SalePriceTo, request.CostPerItem,
+            request.ThumbnailUrl, request.Images, request.VideoUrl,
+            request.CategoryId, request.TagsJson,
+            request.StockQuantity, request.TrackInventory, request.Status,
+            request.SortOrder, request.MetaTitle, request.MetaDescription, request.CanonicalUrl));
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
@@ -48,7 +54,7 @@ public class ProductsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductRequest request)
     {
-        var result = await _sender.Send(new UpdateProductCommand(id, request.Name, request.Sku, request.Description, request.ShortDescription, request.Price, request.SalePrice, request.ThumbnailUrl, request.Images, request.CategoryId, request.StockQuantity, request.TrackInventory, request.Status, request.SortOrder, request.MetaTitle, request.MetaDescription, request.CanonicalUrl));
+        var result = await _sender.Send(new UpdateProductCommand(id, request.Name, request.Sku, request.ShortDescription, request.Description, request.Price, request.SalePrice, request.SalePriceFrom, request.SalePriceTo, request.CostPerItem, request.ThumbnailUrl, request.Images, request.VideoUrl, request.CategoryId, request.TagsJson, request.StockQuantity, request.TrackInventory, request.Status, request.SortOrder, request.MetaTitle, request.MetaDescription, request.CanonicalUrl));
         return Ok(result);
     }
 
@@ -69,10 +75,20 @@ public class ProductsController : ControllerBase
     }
 }
 
+public record CreateProductRequest(
+    string Name, string Slug, string? Sku, string? ShortDescription, string? Description,
+    decimal Price, decimal? SalePrice, DateTime? SalePriceFrom, DateTime? SalePriceTo, decimal? CostPerItem,
+    string? ThumbnailUrl, string? Images, string? VideoUrl,
+    Guid? CategoryId, string? TagsJson,
+    int StockQuantity, bool TrackInventory, ProductStatus Status,
+    int SortOrder, string? MetaTitle, string? MetaDescription, string? CanonicalUrl);
+
 public record UpdateProductRequest(
-    string Name, string? Sku, string? Description, string? ShortDescription,
-    decimal Price, decimal? SalePrice, string? ThumbnailUrl, string? Images,
-    Guid? CategoryId, int StockQuantity, bool TrackInventory, ProductStatus Status,
+    string Name, string? Sku, string? ShortDescription, string? Description,
+    decimal Price, decimal? SalePrice, DateTime? SalePriceFrom, DateTime? SalePriceTo, decimal? CostPerItem,
+    string? ThumbnailUrl, string? Images, string? VideoUrl,
+    Guid? CategoryId, string? TagsJson,
+    int StockQuantity, bool TrackInventory, ProductStatus Status,
     int SortOrder, string? MetaTitle, string? MetaDescription, string? CanonicalUrl);
 
 public record UpdateInventoryRequest(int Quantity, string? Note);

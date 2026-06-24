@@ -5,6 +5,7 @@ using GiapTech.Ipages.Application.Tenants.Queries;
 using GiapTech.Ipages.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using ValidationException = GiapTech.Ipages.Application.Common.Exceptions.ValidationException;
 
 namespace GiapTech.Ipages.Application.Tenants.Commands;
 
@@ -16,7 +17,9 @@ public record UpdateTenantCommand(
     string? Address,
     string? Description,
     TenantStatus Status,
-    DateTime? ExpiresAt) : IRequest<TenantDto>;
+    DateTime? ExpiresAt,
+    string? AdminUsername,
+    string? AdminPassword) : IRequest<TenantDto>;
 
 public class UpdateTenantCommandValidator : AbstractValidator<UpdateTenantCommand>
 {
@@ -24,18 +27,18 @@ public class UpdateTenantCommandValidator : AbstractValidator<UpdateTenantComman
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Email).EmailAddress().When(x => x.Email != null);
+        RuleFor(x => x.AdminPassword).MinimumLength(6)
+            .When(x => !string.IsNullOrWhiteSpace(x.AdminPassword))
+            .WithMessage("Mật khẩu admin phải có ít nhất 6 ký tự.");
     }
 }
 
-public class UpdateTenantCommandHandler : IRequestHandler<UpdateTenantCommand, TenantDto>
+public class UpdateTenantCommandHandler(IApplicationDbContext db, IPasswordHasher passwordHasher)
+    : IRequestHandler<UpdateTenantCommand, TenantDto>
 {
-    private readonly IApplicationDbContext _db;
-
-    public UpdateTenantCommandHandler(IApplicationDbContext db) => _db = db;
-
     public async Task<TenantDto> Handle(UpdateTenantCommand request, CancellationToken ct)
     {
-        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == request.Id, ct)
+        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == request.Id, ct)
             ?? throw new NotFoundException(nameof(Tenant), request.Id);
 
         tenant.Name = request.Name;
@@ -46,7 +49,18 @@ public class UpdateTenantCommandHandler : IRequestHandler<UpdateTenantCommand, T
         tenant.Status = request.Status;
         tenant.ExpiresAt = request.ExpiresAt;
 
-        await _db.SaveChangesAsync(ct);
+        if (!string.IsNullOrWhiteSpace(request.AdminPassword))
+        {
+            var targetUsername = request.AdminUsername;
+            var adminUser = string.IsNullOrWhiteSpace(targetUsername)
+                ? await db.Users.FirstOrDefaultAsync(u => u.TenantId == request.Id && u.IsActive, ct)
+                : await db.Users.FirstOrDefaultAsync(u => u.TenantId == request.Id && u.Username == targetUsername, ct);
+
+            if (adminUser != null)
+                adminUser.PasswordHash = passwordHasher.Hash(request.AdminPassword);
+        }
+
+        await db.SaveChangesAsync(ct);
 
         return new TenantDto(tenant.Id, tenant.Name, tenant.Slug, tenant.Email, tenant.Phone, tenant.Address, tenant.Description, tenant.LogoUrl, tenant.Status, tenant.ExpiresAt, tenant.CreatedAt);
     }

@@ -27,14 +27,19 @@ public record ProductDetailDto(
     string Name,
     string Slug,
     string? Sku,
-    string? Description,
     string? ShortDescription,
+    string? Description,
     decimal Price,
     decimal? SalePrice,
+    DateTime? SalePriceFrom,
+    DateTime? SalePriceTo,
+    decimal? CostPerItem,
     string? ThumbnailUrl,
     string? Images,
+    string? VideoUrl,
     Guid? CategoryId,
     string? CategoryName,
+    string? TagsJson,
     int StockQuantity,
     bool TrackInventory,
     ProductStatus Status,
@@ -47,7 +52,7 @@ public record ProductDetailDto(
     IEnumerable<ProductAttributeDto> Attributes,
     DateTime CreatedAt);
 
-public record ProductVariantDto(Guid Id, string Name, string? Sku, decimal Price, decimal? SalePrice, int StockQuantity, string? ImageUrl, bool IsActive);
+public record ProductVariantDto(Guid Id, string Name, string? Sku, decimal Price, decimal? SalePrice, decimal? Weight, int StockQuantity, string? ImageUrl, string? AttributeValues, int SortOrder, bool IsActive);
 public record ProductAttributeDto(Guid Id, string Name, string Values, int SortOrder);
 
 public record GetProductsQuery(
@@ -65,21 +70,19 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Paginat
 
     public async Task<PaginatedList<ProductListDto>> Handle(GetProductsQuery request, CancellationToken ct)
     {
-        var query = _db.Products.AsNoTracking().Include(p => p.Category);
-
-        IQueryable<Product> filtered = query;
+        IQueryable<Product> query = _db.Products.AsNoTracking().Include(p => p.Category);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
-            filtered = filtered.Where(p => p.Name.Contains(request.Search) || p.Slug.Contains(request.Search) || (p.Sku != null && p.Sku.Contains(request.Search)));
+            query = query.Where(p => p.Name.Contains(request.Search) || p.Slug.Contains(request.Search) || (p.Sku != null && p.Sku.Contains(request.Search)));
 
         if (request.CategoryId.HasValue)
-            filtered = filtered.Where(p => p.CategoryId == request.CategoryId.Value);
+            query = query.Where(p => p.CategoryId == request.CategoryId.Value);
 
         if (request.Status.HasValue)
-            filtered = filtered.Where(p => p.Status == request.Status.Value);
+            query = query.Where(p => p.Status == request.Status.Value);
 
-        var total = await filtered.CountAsync(ct);
-        var items = await filtered
+        var total = await query.CountAsync(ct);
+        var items = await query
             .OrderBy(p => p.SortOrder).ThenByDescending(p => p.CreatedAt)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
@@ -139,10 +142,13 @@ public class GetProductBySlugQueryHandler : IRequestHandler<GetProductBySlugQuer
 internal static class ProductMapping
 {
     internal static ProductDetailDto MapToDetail(Product p) =>
-        new(p.Id, p.Name, p.Slug, p.Sku, p.Description, p.ShortDescription, p.Price, p.SalePrice,
-            p.ThumbnailUrl, p.Images, p.CategoryId, p.Category?.Name, p.StockQuantity, p.TrackInventory,
-            p.Status, p.SortOrder, p.SoldCount, p.MetaTitle, p.MetaDescription, p.CanonicalUrl,
-            p.Variants.Select(v => new ProductVariantDto(v.Id, v.Name, v.Sku, v.Price, v.SalePrice, v.StockQuantity, v.ImageUrl, v.IsActive)),
-            p.Attributes.Select(a => new ProductAttributeDto(a.Id, a.Name, a.Values, a.SortOrder)),
+        new(p.Id, p.Name, p.Slug, p.Sku, p.ShortDescription, p.Description,
+            p.Price, p.SalePrice, p.SalePriceFrom, p.SalePriceTo, p.CostPerItem,
+            p.ThumbnailUrl, p.Images, p.VideoUrl,
+            p.CategoryId, p.Category?.Name, p.TagsJson,
+            p.StockQuantity, p.TrackInventory, p.Status, p.SortOrder, p.SoldCount,
+            p.MetaTitle, p.MetaDescription, p.CanonicalUrl,
+            p.Variants.OrderBy(v => v.SortOrder).Select(v => new ProductVariantDto(v.Id, v.Name, v.Sku, v.Price, v.SalePrice, v.Weight, v.StockQuantity, v.ImageUrl, v.AttributeValues, v.SortOrder, v.IsActive)),
+            p.Attributes.OrderBy(a => a.SortOrder).Select(a => new ProductAttributeDto(a.Id, a.Name, a.Values, a.SortOrder)),
             p.CreatedAt);
 }

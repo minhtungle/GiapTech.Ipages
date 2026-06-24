@@ -39,6 +39,22 @@ public class TenantMiddleware(RequestDelegate next, IConfiguration configuration
         else if (host.Equals(baseDomain, StringComparison.OrdinalIgnoreCase) ||
                  host.Equals($"host.{baseDomain}", StringComparison.OrdinalIgnoreCase))
         {
+            // Fallback: if the JWT contains a tenantId claim, use it (supports localhost dev)
+            var tenantIdClaim = context.User.FindFirst("tenantId")?.Value;
+            if (!string.IsNullOrEmpty(tenantIdClaim) && Guid.TryParse(tenantIdClaim, out var jwtTenantId))
+            {
+                var db = context.RequestServices.GetRequiredService<ApplicationDbContext>();
+                var tenant = await db.Tenants
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.Id == jwtTenantId);
+
+                if (tenant != null)
+                {
+                    tenantService.SetTenant(tenant.Id, tenant.Slug);
+                    await next(context);
+                    return;
+                }
+            }
             tenantService.SetHostAdmin();
         }
 

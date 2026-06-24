@@ -11,6 +11,7 @@ import CustomersPage from './pages/CustomersPage'
 import ArticlesPage from './pages/ArticlesPage'
 import MediaPage from './pages/MediaPage'
 import ProductCategoriesPage from './pages/ProductCategoriesPage'
+import ProductFormPage from './pages/ProductFormPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore()
@@ -40,6 +41,8 @@ export default function App() {
           >
             <Route index element={<DashboardPage />} />
             <Route path="products" element={<ProductsPage />} />
+            <Route path="products/new" element={<ProductFormPage />} />
+            <Route path="products/:id/edit" element={<ProductFormPage />} />
             <Route path="product-categories" element={<ProductCategoriesPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="customers" element={<CustomersPage />} />

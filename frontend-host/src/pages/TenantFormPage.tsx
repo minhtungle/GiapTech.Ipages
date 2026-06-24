@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Card, DatePicker, Form, Input, message, Select, Typography } from 'antd'
+import { Button, Card, DatePicker, Divider, Form, Input, message, Select, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../lib/api'
 
-const { Title } = Typography
+const { Title, Text } = Typography
 
 export default function TenantFormPage() {
   const { id } = useParams<{ id: string }>()
@@ -55,11 +55,18 @@ export default function TenantFormPage() {
       <Card>
         <Title level={4}>{isEdit ? 'Chỉnh sửa Tenant' : 'Tạo Tenant mới'}</Title>
         <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ maxWidth: 600 }}>
+
+          <Divider orientation="left" orientationMargin={0}>Thông tin tenant</Divider>
+
           <Form.Item name="name" label="Tên tenant" rules={[{ required: true }]}>
             <Input placeholder="VD: Cửa hàng ABC" />
           </Form.Item>
           {!isEdit && (
-            <Form.Item name="slug" label="Slug (subdomain)" rules={[{ required: true, pattern: /^[a-z0-9-]+$/, message: 'Chỉ dùng chữ thường, số, dấu gạch ngang' }]}>
+            <Form.Item
+              name="slug"
+              label="Slug (subdomain)"
+              rules={[{ required: true, pattern: /^[a-z0-9-]+$/, message: 'Chỉ dùng chữ thường, số, dấu gạch ngang' }]}
+            >
               <Input placeholder="VD: abc" addonAfter=".localhost" />
             </Form.Item>
           )}
@@ -82,7 +89,30 @@ export default function TenantFormPage() {
           <Form.Item name="expiresAt" label="Ngày hết hạn">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
-          <Form.Item>
+
+          <Divider orientation="left" orientationMargin={0}>
+            Tài khoản admin tenant
+            {isEdit && <Text type="secondary" style={{ fontWeight: 400, marginLeft: 8, fontSize: 13 }}>— để trống nếu không đổi mật khẩu</Text>}
+          </Divider>
+
+          <Form.Item
+            name="adminUsername"
+            label="Tên đăng nhập admin"
+            rules={isEdit ? [] : [{ required: false }]}
+          >
+            <Input placeholder={isEdit ? 'Nhập username cần đổi mật khẩu' : 'VD: admin'} />
+          </Form.Item>
+          <Form.Item
+            name="adminPassword"
+            label={isEdit ? 'Mật khẩu mới' : 'Mật khẩu admin'}
+            rules={[
+              { min: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự' },
+            ]}
+          >
+            <Input.Password placeholder={isEdit ? 'Để trống nếu không đổi' : 'Ít nhất 6 ký tự'} />
+          </Form.Item>
+
+          <Form.Item style={{ marginTop: 24 }}>
             <Button type="primary" htmlType="submit" loading={mutation.isPending}>
               {isEdit ? 'Cập nhật' : 'Tạo mới'}
             </Button>

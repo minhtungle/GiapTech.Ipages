@@ -172,11 +172,11 @@ try
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "GiapTech.Ipages API v1"));
 
     app.UseMiddleware<ExceptionMiddleware>();
-    app.UseMiddleware<TenantMiddleware>();
 
     app.UseCors();
     app.UseRateLimiter();
     app.UseAuthentication();
+    app.UseMiddleware<TenantMiddleware>();
     app.UseAuthorization();
 
     app.MapControllers().RequireRateLimiting("per-tenant");

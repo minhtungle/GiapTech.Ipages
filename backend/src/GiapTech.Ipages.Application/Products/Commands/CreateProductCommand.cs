@@ -13,13 +13,18 @@ public record CreateProductCommand(
     string Name,
     string Slug,
     string? Sku,
-    string? Description,
     string? ShortDescription,
+    string? Description,
     decimal Price,
     decimal? SalePrice,
+    DateTime? SalePriceFrom,
+    DateTime? SalePriceTo,
+    decimal? CostPerItem,
     string? ThumbnailUrl,
     string? Images,
+    string? VideoUrl,
     Guid? CategoryId,
+    string? TagsJson,
     int StockQuantity,
     bool TrackInventory,
     ProductStatus Status,
@@ -36,43 +41,42 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
         RuleFor(x => x.Slug).NotEmpty().MaximumLength(200).Matches("^[a-z0-9-]+$").WithMessage("Slug chỉ chứa chữ thường, số và dấu gạch ngang.");
         RuleFor(x => x.Price).GreaterThanOrEqualTo(0);
         RuleFor(x => x.SalePrice).GreaterThanOrEqualTo(0).LessThan(x => x.Price).When(x => x.SalePrice.HasValue);
+        RuleFor(x => x.CostPerItem).GreaterThanOrEqualTo(0).When(x => x.CostPerItem.HasValue);
         RuleFor(x => x.StockQuantity).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.SalePriceTo).GreaterThan(x => x.SalePriceFrom).When(x => x.SalePriceFrom.HasValue && x.SalePriceTo.HasValue);
     }
 }
 
-public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, ProductDetailDto>
+public class CreateProductCommandHandler(IApplicationDbContext db, ICurrentTenantService tenant)
+    : IRequestHandler<CreateProductCommand, ProductDetailDto>
 {
-    private readonly IApplicationDbContext _db;
-    private readonly ICurrentTenantService _tenant;
-
-    public CreateProductCommandHandler(IApplicationDbContext db, ICurrentTenantService tenant)
-    {
-        _db = db;
-        _tenant = tenant;
-    }
-
     public async Task<ProductDetailDto> Handle(CreateProductCommand request, CancellationToken ct)
     {
-        if (_tenant.TenantId == null)
+        if (tenant.TenantId == null)
             throw new ForbiddenException();
 
-        var slugExists = await _db.Products.AnyAsync(p => p.Slug == request.Slug, ct);
+        var slugExists = await db.Products.AnyAsync(p => p.Slug == request.Slug, ct);
         if (slugExists)
             throw new ValidationException(new[] { new FluentValidation.Results.ValidationFailure("Slug", "Slug đã tồn tại.") });
 
         var product = new Product
         {
-            TenantId = _tenant.TenantId.Value,
+            TenantId = tenant.TenantId.Value,
             Name = request.Name,
             Slug = request.Slug,
             Sku = request.Sku,
-            Description = request.Description,
             ShortDescription = request.ShortDescription,
+            Description = request.Description,
             Price = request.Price,
             SalePrice = request.SalePrice,
+            SalePriceFrom = request.SalePriceFrom,
+            SalePriceTo = request.SalePriceTo,
+            CostPerItem = request.CostPerItem,
             ThumbnailUrl = request.ThumbnailUrl,
             Images = request.Images,
+            VideoUrl = request.VideoUrl,
             CategoryId = request.CategoryId,
+            TagsJson = request.TagsJson,
             StockQuantity = request.StockQuantity,
             TrackInventory = request.TrackInventory,
             Status = request.Status,
@@ -82,8 +86,8 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             CanonicalUrl = request.CanonicalUrl
         };
 
-        _db.Products.Add(product);
-        await _db.SaveChangesAsync(ct);
+        db.Products.Add(product);
+        await db.SaveChangesAsync(ct);
 
         return ProductMapping.MapToDetail(product);
     }
